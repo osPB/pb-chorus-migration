@@ -4,6 +4,7 @@
 import fs from 'fs';
 import * as stream from 'stream';
 import { promisify } from 'util';
+import sanitize from "sanitize-filename";
 
 import axios from 'axios';
 
@@ -28,8 +29,22 @@ export async function downloadFile(fileUrl, outputLocationPath, session) {
   });
 }
 
+const isUserDirCreated = (user) => (fs.existsSync(`${process.cwd()}/output/${user}`));
+
 function getUserDirectory(userId) {
   // TODO: Create user directory if it does not exist yet
+  const cwd = process.cwd();
+  const userDir = `${cwd}/output/${userId}`;
+  if (fs.existsSync(cwd)) {
+    if (isUserDirCreated(userId)) {
+      return `${process.cwd()}/output/${userId}`    
+    }
+  }
+  fs.mkdirSync(userDir, { recursive: true }, (err) => {
+    if (err) {
+      throw err;
+    }
+  });
   return `${process.cwd()}/output/${userId}`;
 }
 
@@ -65,8 +80,9 @@ export async function downloadEngagement(engagement, session) {
   // Formatting into ISO to allow string sorting by date.
   const dateStr = dateObj.toISOString();
 
-  const fileName = `${dateStr} ${subject}.${fileExtension}`;
-  const filePath = `${getUserDirectory(userId)}/${fileName}`; // Save files under owner's directory.
+  const fileName = sanitize(`${dateStr} ${subject}.${fileExtension}`);
+  const userDirectory = getUserDirectory(userId);
+  const filePath = `${userDirectory}/${fileName}`; // Save files under owner's directory.
 
   console.log('[downloadEngagement] fileUrl: ', fileUrl);
   console.log('[downloadEngagement] filePath: ', filePath);
