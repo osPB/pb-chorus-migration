@@ -22,6 +22,9 @@ export async function downloadFile(fileUrl, outputLocationPath, session) {
     }
   }).then(async response => {
     // console.log('[downloadFile] response: ', response);
+    if (response.headers['content-type'] === 'text/html') {
+      throw new Error('Bad file content');
+    }
     response.data.pipe(writer);
 
     return finished(writer); // Promise
