@@ -14,6 +14,8 @@ async function processPage(engagements) {
   // Split downloads across all available sessions;
   const downloadPools = DOWNLOAD_SESSION_COOKIES.map((session, index) => engagements.slice(index * itemsPerPool, (index + 1) * itemsPerPool));
 
+  console.log(`[processPage] Using ${downloadPools.length} download pools with ${itemsPerPool} items per pool`);
+
   await Promise.all(
     downloadPools.map((pool, index) => downloadMultiple(pool, DOWNLOAD_SESSION_COOKIES[index]))
   );

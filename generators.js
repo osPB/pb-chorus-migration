@@ -16,11 +16,12 @@ const getEngagementPage = (params) => apiClient.get('/', { params }).then(({ dat
 // Iterable Engagement API page generator
 export async function* engagementPageGenerator() {
   let continuationKey = null;
-  const params = {};
+  // COMBAK: no show filter?
+  const params = { hide_no_show: true };
 
   do {
     let { continuation_key: nextKey, engagements } = await getEngagementPage(params);
-    console.log('Next Continuation Key: ', nextKey);
+    console.log('[engagementPageGenerator] Next Continuation Key: ', nextKey);
 
     continuationKey = nextKey.replace(/^\s$/, ''); // Takes care of empty key being sent as ' ' from the API
     params.continuation_key = continuationKey;
