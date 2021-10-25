@@ -4,9 +4,9 @@
 import fs from 'fs';
 import * as stream from 'stream';
 import { promisify } from 'util';
-import sanitize from "sanitize-filename";
 
 import axios from 'axios';
+import sanitize from "sanitize-filename";
 
 
 const finished = promisify(stream.finished);
@@ -31,21 +31,19 @@ export async function downloadFile(fileUrl, outputLocationPath, session) {
 
 const isUserDirCreated = (user) => (fs.existsSync(`${process.cwd()}/output/${user}`));
 
-function getUserDirectory(userId) {
+function getUserDirectory(userEmail) {
   // TODO: Create user directory if it does not exist yet
   const cwd = process.cwd();
-  const userDir = `${cwd}/output/${userId}`;
-  if (fs.existsSync(cwd)) {
-    if (isUserDirCreated(userId)) {
-      return `${process.cwd()}/output/${userId}`    
-    }
+  const userDir = `${cwd}/output/${userEmail}`;
+  if (isUserDirCreated(userEmail)) {
+    return `${process.cwd()}/output/${userEmail}`    
   }
   fs.mkdirSync(userDir, { recursive: true }, (err) => {
     if (err) {
       throw err;
     }
   });
-  return `${process.cwd()}/output/${userId}`;
+  return `${process.cwd()}/output/${userEmail}`;
 }
 
 // Download a single engagement using the provided session cookie for auth
@@ -57,7 +55,7 @@ export async function downloadEngagement(engagement, session) {
   // console.log('[downloadEngagement] engagement: ', engagement);
 
   const {
-    user_id: userId, // id of the owning user
+    user_email: userEmail, // id of the owning user
     subject, // Meeting title
     date_time: dateTime, // Meeting timestamp, in seconds.
     engagement_id: engagementId,
@@ -81,8 +79,7 @@ export async function downloadEngagement(engagement, session) {
   const dateStr = dateObj.toISOString();
 
   const fileName = sanitize(`${dateStr} ${subject}.${fileExtension}`);
-  const userDirectory = getUserDirectory(userId);
-  const filePath = `${userDirectory}/${fileName}`; // Save files under owner's directory.
+  const filePath = `${getUserDirectory(userEmail)}/${fileName}`; // Save files under owner's directory.
 
   console.log('[downloadEngagement] fileUrl: ', fileUrl);
   console.log('[downloadEngagement] filePath: ', filePath);
