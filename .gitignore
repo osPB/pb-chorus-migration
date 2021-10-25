@@ -106,3 +106,4 @@ dist
 out.json
 output/
 .DS_Store
+*.tar.gz
