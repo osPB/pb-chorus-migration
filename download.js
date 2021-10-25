@@ -32,21 +32,21 @@ export async function downloadFile(fileUrl, outputLocationPath, session) {
   });
 }
 
-const isUserDirCreated = (user) => (fs.existsSync(`${process.cwd()}/output/${user}`));
+const checkPathExists = (userDir) => fs.existsSync(userDir);
 
 function getUserDirectory(userEmail) {
-  // TODO: Create user directory if it does not exist yet
-  const cwd = process.cwd();
-  const userDir = `${cwd}/output/${userEmail}`;
-  if (isUserDirCreated(userEmail)) {
-    return `${process.cwd()}/output/${userEmail}`    
+  // Create user directory if it does not exist yet
+  const userDir = `${process.cwd()}/output/${userEmail}`;
+
+  if (checkPathExists(userDir)) {
+    return userDir;
   }
   fs.mkdirSync(userDir, { recursive: true }, (err) => {
     if (err) {
       throw err;
     }
   });
-  return `${process.cwd()}/output/${userEmail}`;
+  return userDir;
 }
 
 // Download a single engagement using the provided session cookie for auth
@@ -86,6 +86,11 @@ export async function downloadEngagement(engagement, session) {
 
   console.log('[downloadEngagement] fileUrl: ', fileUrl);
   console.log('[downloadEngagement] filePath: ', filePath);
+
+  // Check if target file already exists.
+  if (checkPathExists(filePath)) {
+    console.warn(`[downloadEngagement] File at path (${filePath}) already exists. Skipping...`);
+  }
 
   await downloadFile(fileUrl, filePath, session);
 
