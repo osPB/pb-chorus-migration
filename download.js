@@ -8,6 +8,8 @@ import { promisify } from 'util';
 import axios from 'axios';
 import sanitize from "sanitize-filename";
 
+import { SilentError } from './errors.js';
+
 
 const finished = promisify(stream.finished);
 
@@ -90,6 +92,7 @@ export async function downloadEngagement(engagement, session) {
   // Check if target file already exists.
   if (checkPathExists(filePath)) {
     console.warn(`[downloadEngagement] File at path (${filePath}) already exists. Skipping...`);
+    throw new SilentError('Duplicate file');
   }
 
   await downloadFile(fileUrl, filePath, session);
@@ -100,6 +103,7 @@ export async function downloadEngagement(engagement, session) {
 // Download a slice of the page (sequentially, uses one session)
 export async function downloadMultiple(items, session) {
   let failedCount = 0;
+  let skippedCount = 0;
   let downloadedCount = 0;
 
   for (let engagement of items) {
@@ -107,13 +111,18 @@ export async function downloadMultiple(items, session) {
       await downloadEngagement(engagement, session);
       downloadedCount++;
     } catch (e) {
-      console.error('[downloadMultiple] Failed to download engagement. E: ', e);
-      failedCount++;
+      if (e instanceof SilentError) {
+        skippedCount++;
+      } else {
+        console.error('[downloadMultiple] Failed to download engagement. E: ', e);
+        failedCount++;
+      }
     }
   }
 
   console.log('[downloadMultiple] failedCount: ', failedCount);
+  console.log('[downloadMultiple] skippedCount: ', skippedCount);
   console.log('[downloadMultiple] downloadedCount: ', downloadedCount);
 
-  return { failedCount, downloadedCount };
+  return { failedCount, skippedCount, downloadedCount };
 }
