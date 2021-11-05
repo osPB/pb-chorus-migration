@@ -148,14 +148,14 @@ async function processEngagement(fileName) {
   const sanitizedFileName = formatFileName(fileName);
 
   const { requestId: createRequestId, callId: createCallId } = await createCall(sanitizedFileName);
-  console.log(`[processEngagement] Call created with requestId: ${createRequestId} and callId: ${createCallId}`);
+  console.log(`[processEngagement] Call created with requestId: ${createRequestId} and callId: ${chalk.yellow.bold(createCallId)}`);
   const { requestId: uploadRequestId, callId: uploadCallId, url } = await uploadCallMedia(createCallId, fileName, sanitizedFileName.split('/').pop());
-  console.log(`[processEngagement] Call media uploaded with requestId: ${uploadRequestId} and callId: ${uploadCallId}`);
+  console.log(`[processEngagement] Call media uploaded with requestId: ${uploadRequestId} and callId: ${chalk.yellow(uploadCallId)}`);
   if (createCallId !== uploadCallId) {
-    console.warn('WARNING: Create and Upload calls returned different call IDs');
+    console.warn(chalk.red('WARNING: Create and Upload calls returned different call IDs'));
   }
 
-  console.log('Call will be available at this URL shortly: ', url);
+  console.log('Call will be available at this URL shortly: ', chalk.blue.underline.bold(url));
 }
 
 // Steps to be executed before starting the uploads
