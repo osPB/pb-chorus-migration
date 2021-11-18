@@ -30,7 +30,6 @@ apiClient.interceptors.response.use(response => response, error => {
     console.error('[apiClient] Response error:');
     console.log(error.response.data);
     console.log(error.response.status);
-    console.log(error.response.headers);
   } else if (error.request) {
     console.error('[apiClient] Request error: ', error.message);
   } else {
@@ -39,6 +38,8 @@ apiClient.interceptors.response.use(response => response, error => {
 
   return Promise.reject(error);
 });
+
+const asyncSleepSeconds = (seconds) => new Promise(resolve => setTimeout(resolve, seconds * 1000));
 
 const userMapping = {};
 
@@ -120,12 +121,40 @@ function formatCallData(fileName) {
   return callData;
 }
 
+async function sendCreateCallRequest(callData) {
+  const { status, data } = await apiClient.post('/v2/calls', callData);
+  console.log('[sendCreateCallRequest] statusCode: ', status);
+
+  return data;
+}
+
 async function createCall(fileName) {
   const callData = formatCallData(fileName);
-  console.log('[createCall] callData: ', callData);
 
-  const { status, data } = await apiClient.post('/v2/calls', callData);
-  console.log('[createCall] statusCode: ', status);
+  // 429 -> grab Retry-After header -> wait specified time in seconds -> retry
+  try {
+    return await sendCreateCallRequest(callData);
+  } catch (e) {
+    if (e.response && e.response.status) {
+      // Response error
+      if (e.response.status === 429 && e.response.headers['retry-after'] ) {
+        // Rate limit exceeded, wait and try again
+        const timeToWait = Number(e.response.headers['retry-after']) || 1;
+        console.log('[createCall] Received 429, waiting for (s): ', timeToWait);
+        await asyncSleepSeconds(timeToWait);
+        console.log('[createCall] Retrying...');
+
+        return await sendCreateCallRequest(callData);
+      } else {
+        throw e; // Propagate 400 up
+      }
+    }
+  }
+}
+
+async function sendUploadMediaRequest(callId, form, headers) {
+  const { status, data } = await apiClient.put(`/v2/calls/${callId}/media`, form, { headers });
+  console.log('[sendUploadMediaRequest] statusCode: ', status);
 
   return data;
 }
@@ -136,19 +165,54 @@ async function uploadCallMedia(callId, fileName, fileTitle) {
   const form = new FormData();
   form.append('mediaFile', fileStream, fileTitle);
 
+  const formHeaders = { ...form.getHeaders() };
+
   console.log('[uploadCallMedia] Starting file upload...');
 
-  const { status, data } = await apiClient.put(`/v2/calls/${callId}/media`, form, { headers: { ...form.getHeaders() } });
-  console.log('[uploadCallMedia] statusCode: ', status);
+  try {
+    return await sendUploadMediaRequest(callId, form, formHeaders);
+  } catch (e) {
+    if (e.response && e.response.status) {
+      // Response error
+      if (e.response.status === 429 && e.response.headers['retry-after'] ) {
+        // Rate limit exceeded, wait and try again
+        const timeToWait = Number(e.response.headers['retry-after']) || 1;
+        console.log('[createCall] Received 429, waiting for (s): ', timeToWait);
+        await asyncSleepSeconds(timeToWait);
+        console.log('[createCall] Retrying...');
 
-  return data;
+        return await sendUploadMediaRequest(callId, form, formHeaders);
+      } else {
+        throw e; // Propagate 400 up
+      }
+    }
+  }
+}
+
+async function assertCallIncomplete(callId) {
+  try {
+    const { status } = await apiClient.get(`/v2/calls/${callId}`);
+    return status > 400;
+  } catch (e) {
+    return e.response.status === 404;
+  }
 }
 
 async function processEngagement(fileName) {
   const sanitizedFileName = formatFileName(fileName);
 
-  const { requestId: createRequestId, callId: createCallId } = await createCall(sanitizedFileName);
+  let createCallId;
+  let createRequestId;
+
+  // Create call with retry
+  const response = await createCall(sanitizedFileName);
+  createCallId = response.callId;
+  createRequestId = response.requestId;
+
   console.log(`[processEngagement] Call created with requestId: ${createRequestId} and callId: ${chalk.yellow.bold(createCallId)}`);
+
+  // Upload call media
+
   const { requestId: uploadRequestId, callId: uploadCallId, url } = await uploadCallMedia(createCallId, fileName, sanitizedFileName.split('/').pop());
   console.log(`[processEngagement] Call media uploaded with requestId: ${uploadRequestId} and callId: ${chalk.yellow(uploadCallId)}`);
   if (createCallId !== uploadCallId) {
